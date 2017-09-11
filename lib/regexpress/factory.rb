@@ -12,8 +12,8 @@ module Riel
 end
 
 class RegexpFactory
-  def from_shell_pattern shpat
-    @patterns ||= Hash.new.tap do |pats|
+  def initialize 
+    @shell_patterns = Hash.new.tap do |pats|
       pats['*'] = '.*' 
       pats['?'] = '.'
       %w{ . $ / ( ) }.each do |ch|
@@ -21,16 +21,29 @@ class RegexpFactory
       end
     end
 
-    re = Regexp.new '(\\\.)|(.)'
-    
+    @negative_regexp = Regexp.new '^!/'
+  end
+  
+  def from_shell_pattern shpat
+    re = Regexp.new '(\\\.)|(.)'    
     converted = ""
     shpat.gsub(re) do
-      converted << ($1 || @patterns[$2] || $2)
+      converted << ($1 || @shell_patterns[$2] || $2)
     end
-
     converted
   end
 
+  # Creates a regular expression from a combination of a pattern and arguments:
+  
+  #   /foobar/     -- "foobar"
+  #   /foo/bar/    -- "foo", then slash, then "bar"
+  #   /foo\/bar/   -- same as above
+  #   /foo/bar/i   -- same as above, case insensitive
+  #   /foo/bari    -- "/foo/bari" exactly
+  #   /foo/bar\/i  -- "/foo/bar/i" exactly
+  #   foo/bar/     -- "foo/bar/" exactly
+  #   foo/bar/     -- "foo/bar/" exactly
+  
   def create pat, args = Hash.new
     negated    = args[:negated]
     ignorecase = args[:ignorecase]
@@ -38,9 +51,31 @@ class RegexpFactory
     wholelines = args[:wholelines]
     extended   = args[:extended]
     multiline  = args[:multiline]
-    
 
     Regexp.new pat
+  end
+
+  def negative? pat
+    @negative_regexp.match pat
+  end
+
+  def pattern_to_flags pattern
+    flagre = Regexp.new '^\/(.*[^\\\])\/([mix]+)?'
+    opts_to_chars = { multiline: 'm', ignorecase: 'i', extended: 'x' }
+
+    flags = { pattern: pattern }.merge opts_to_chars.keys.collect { |x| [ x, false ] }.to_h
+    
+    if md = flagre.match(pattern)
+      flags[:pattern] = md[1]
+      
+      if modifiers = md[2]
+        opts_to_chars.each do |opt, ch|
+          flags[opt] = modifiers.include? ch
+        end
+      end
+    end
+    
+    flags
   end
 end
 
