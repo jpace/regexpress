@@ -8,9 +8,6 @@ class NegatedRegexp < Regexp
   end
 end
 
-module Riel
-end
-
 class RegexpFactory
   def initialize 
     @shell_patterns = Hash.new.tap do |pats|
@@ -22,6 +19,13 @@ class RegexpFactory
     end
 
     @negative_regexp = Regexp.new '^!/'
+
+    @word_start_re = Regexp.new('^' +           # start of word
+                                '[\[\(]*' +     # parentheses or captures, maybe
+                                '(?:\\\w|\w|\.)') # literal \w, or what \w matches, or dot
+
+    # general match for a, a*, a?, a{3,4}, etc.
+    @word_end_re = Regexp.new('(?:\\\w|\w)\]*(?:\*|\.|\)|\+|\?|\{\d*,\d*\})?$')
   end
   
   def from_shell_pattern shpat
@@ -55,10 +59,6 @@ class RegexpFactory
     Regexp.new pat
   end
 
-  def negative? pat
-    @negative_regexp.match pat
-  end
-
   def pattern_to_flags pattern
     flagre = Regexp.new '^\/(.*[^\\\])\/([mix]+)?'
     opts_to_chars = { multiline: 'm', ignorecase: 'i', extended: 'x' }
@@ -76,6 +76,23 @@ class RegexpFactory
     end
     
     flags
+  end
+
+  def negative? pat
+    match? @negative_regexp, pat
+  end
+
+  def starts_on_word_boundary str
+    match? @word_start_re, str
+  end
+
+  def ends_on_word_boundary str
+    match? @word_end_re, str
+  end
+
+  # this seems to be added in 2.4
+  def match? re, str
+    re.match(str) != nil
   end
 end
 
