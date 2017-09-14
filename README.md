@@ -29,9 +29,8 @@ well.
    re = rf.create '/a b c d+/ix'
    re = rf.create 'a b c d+', extended: true
    re = rf.create '/a b c d+/x'
+   re = rf.create 'abcd+', wholewords: true, ignorecase: true
 ```
-
-TODO: Write usage instructions here
 
 ## Development
 
@@ -45,9 +44,7 @@ will create a git tag for the version, push git commits and tags, and push the `
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/jpace/regexpress. This
-project is intended to be a safe, welcoming space for collaboration, and contributors are expected
-to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/jpace/regexpress.
 
 ## License
 
