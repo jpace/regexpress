@@ -8,6 +8,7 @@ class NegatedRegexp < Regexp
   end
 end
 
+# Builds regular expressions
 class RegexpFactory
   def initialize 
     @shell_patterns = Hash.new.tap do |pats|
@@ -18,6 +19,8 @@ class RegexpFactory
       end
     end
 
+    @pattern_re = Regexp.new '^\/(.*[^\\\])\/([mix]+)?'
+
     @negative_regexp = Regexp.new '^!/'
 
     @word_start_re = Regexp.new('^' +           # start of word
@@ -26,15 +29,6 @@ class RegexpFactory
 
     # general match for a, a*, a?, a{3,4}, etc.
     @word_end_re = Regexp.new('(?:\\\w|\w)\]*(?:\*|\.|\)|\+|\?|\{\d*,\d*\})?$')
-  end
-  
-  def from_shell_pattern shpat
-    re = Regexp.new '(\\\.)|(.)'    
-    converted = ""
-    shpat.gsub(re) do
-      converted << ($1 || @shell_patterns[$2] || $2)
-    end
-    converted
   end
 
   # Creates a regular expression from a combination of a pattern and arguments:
@@ -56,16 +50,36 @@ class RegexpFactory
     extended   = args[:extended]
     multiline  = args[:multiline]
 
-    Regexp.new pat
+    flags = pattern_to_flags pat
+    arg = flags_to_arg flags
+
+    pat = pat.sub @pattern_re, '\1'
+
+    if wholewords
+      pat = '\b' + pat + '\b'
+    elsif wholelines
+      pat = '^' + pat + '$'
+    end
+
+    cls = negated ? NegatedRegexp : Regexp
+    return cls.new pat, arg
+  end
+  
+  def from_shell_pattern shpat
+    re = Regexp.new '(\\\.)|(.)'    
+    converted = ""
+    shpat.gsub(re) do
+      converted << ($1 || @shell_patterns[$2] || $2)
+    end
+    converted
   end
 
   def pattern_to_flags pattern
-    flagre = Regexp.new '^\/(.*[^\\\])\/([mix]+)?'
     opts_to_chars = { multiline: 'm', ignorecase: 'i', extended: 'x' }
-
+    
     flags = { pattern: pattern }.merge opts_to_chars.keys.collect { |x| [ x, false ] }.to_h
     
-    if md = flagre.match(pattern)
+    if md = @pattern_re.match(pattern)
       flags[:pattern] = md[1]
       
       if modifiers = md[2]
@@ -93,6 +107,20 @@ class RegexpFactory
   # this seems to be added in 2.4
   def match? re, str
     re.match(str) != nil
+  end
+  
+  def check_whole_word pattern
+    { starts: starts_on_word_boundary(pattern), ends: ends_on_word_boundary(pattern) }
+  end
+
+  def flags_to_arg flags
+    [
+      [ :ignorecase, Regexp::IGNORECASE ],
+      [ :extended,   Regexp::EXTENDED   ],
+      [ :multiline,  Regexp::MULTILINE  ]
+    ].inject(0) do |arg, fields|
+      arg | (flags[fields[0]] ? fields[1] : 0)
+    end
   end
 end
 

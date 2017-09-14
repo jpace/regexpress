@@ -23,9 +23,19 @@ class RegexpFactoryTestCase < Test::Unit::TestCase
 
   param_test [
     [ Regexp.new("a"), "a", Hash.new ],
-    [ Regexp.new("b"), "b", Hash.new ],
+    [ Regexp.new("c"), "c", Hash.new ],
+    [ Regexp.new("c", Regexp::IGNORECASE), "/c/i", Hash.new ],
+    [ Regexp.new("c/i"), "c/i", Hash.new ],
+    [ Regexp.new("\\bdef\\b"), "def", { wholewords: true } ],
+    [ Regexp.new("^def$"), "def", { wholelines: true } ],
+    [ Regexp.new("\\bdef\\b"), "def", { wholewords: true, wholelines: true } ],
   ] do |exp, pat, args|
     assert_equal exp, RegexpFactory.new.create(pat, args), "pat: #{pat}; args: #{args}"
+  end
+
+  def test_negated
+    re = RegexpFactory.new.create "def", negated: true
+    assert_kind_of NegatedRegexp, re
   end
 
   param_test [
@@ -82,20 +92,36 @@ class RegexpFactoryTestCase < Test::Unit::TestCase
   param_test ends_on_word_boundary_data do |exp, pat|
     matches = RegexpFactory.new.ends_on_word_boundary pat
     assert_equal exp, matches, "pat: #{pat}"
-  end  
-end
+  end
 
-# class RegexpTestCase < Test::Unit::TestCase
-#   include Paramesan
-  
-#   def test_negated
-#     assert NegatedRegexp.new("a[b-z]").match("aa")
-#     assert NegatedRegexp.new(".+").match("")
-#   end
-  
-#   def test_invalid_whole_word
-#     assert_raises(RuntimeError) do
-#       Regexp.create ':abc', wholewords: true
-#     end
-#   end
-# end
+  def self.check_whole_word_data
+    Array.new.tap do |params|
+      params.concat [ 'a',   'ab'   ].collect { |pat| [ true,  true,  pat ] }
+      params.concat [ ' a',  ' ab'  ].collect { |pat| [ false, true,  pat ] }
+      params.concat [ 'a ',  'ab '  ].collect { |pat| [ true,  false, pat ] }
+      params.concat [ ' a ', ' ab ' ].collect { |pat| [ false, false, pat ] }
+    end
+  end
+
+  param_test check_whole_word_data do |exp_starts, exp_ends, pat|
+    check = RegexpFactory.new.check_whole_word pat
+
+    msg = "pat: #{pat}"
+    assert_equal exp_starts, check[:starts], msg
+    assert_equal exp_ends,   check[:ends],   msg
+  end
+
+  param_test [
+    [ 0, Hash.new ],
+ 
+    [ Regexp::IGNORECASE, { ignorecase: true } ],
+    [ 0,                  { ignorecase: false } ],
+    [ Regexp::MULTILINE,  { multiline: true } ],
+    [ 0,                  { multiline: false } ],
+    [ Regexp::EXTENDED,   { extended: true } ],
+    [ Regexp::IGNORECASE | Regexp::EXTENDED,   { ignorecase: true, extended: true } ],
+  ] do |exp, flags|
+    arg = RegexpFactory.new.flags_to_arg flags
+    assert_equal exp, arg, "flags: #{flags}"
+  end
+end
